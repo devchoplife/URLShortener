@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/boltdb/bolt"
+	"gopkg.in/yaml.v2"
 )
 
 func defaultMux() *http.ServeMux {
@@ -27,12 +30,12 @@ func MapHandler(pathsToURLs map[string]string, fallback http.Handler) http.Handl
 	}
 }
 
-func JSONHandler(jsonData []byte, fallback http.Handler) (http.HandlerFunc, error) {
+func JSONHandler(jsondata []byte, fallback http.Handler) (http.HandlerFunc, error) {
 	var pathsToURLs []struct {
 		Path string `json:"path"`
 		URL  string `json:"url"`
 	}
-	if err := json.Unmarshal(jsonData, &pathsToURLs); err != nil {
+	if err := json.Unmarshal(jsondata, &pathsToURLs); err != nil {
 		return nil, err
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +46,33 @@ func JSONHandler(jsonData []byte, fallback http.Handler) (http.HandlerFunc, erro
 		}
 		fallback.ServeHTTP(w, r)
 	}, nil
+}
+
+func YAMLHandler(yamldata []byte, fallback http.Handler) (http.HandlerFunc, error) {
+	var pathsToURLs []struct {
+		Path string `yaml:"path"`
+		URL  string `yaml:"url"`
+	}
+
+	if err := yaml.Unmarshal(yamldata, &pathsToURLs); err != nil {
+		return nil, error
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		for _, urlPath := range pathsToURLs {
+			if urlPath.Path == r.URL.Path {
+				http.Redirect(w, r, urlPath.URL, http.StatusFound)
+			}
+		}
+		fall.ServeHTTP(w, r)
+	}, nil
+}
+
+func BOLTHandler(db *bolt.DB, fallback http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := db.View(func(tx *bolt.Tx) error {
+			bucket:= tx.Bucket
+		})
+	}
 }
 
 func main() {
@@ -77,5 +107,30 @@ func main() {
 		fmt.Println("Starting the server on:8080")
 		http.ListenAndServe(":8080", jsonHandler)
 	} else if yamlFile != "" {
-		
+		yamlData, err := ioutil.ReadFile(yamlFile)
+		if err != nil {
+			panic(err)
+		}
+		//Build the YAMLHandler using the mapHandler as the fallback
+		yamlHandler, err := YAMLHandler([]byte(yamlData), mapHandler)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Starting the server on:8080")
+		http.ListenAndServe(":8080", yamlHandler)
+	} else if boltFile != nil {
+		db, err := bolt.Open(boltFile, 0600, nil)
+		if err != nil {
+			panic(err)
+		}
+		defer db.Close() //Close the database
+
+		//Build the BoltHandler using the mapHandler as the fallback 
+		boltHandler := BOLTHandler(db, mapHandler)
+		fmt.Println("Starting the server on:8080")
+		http.ListenAndServe(":8080", boltHandler)
+	} else {
+		fmt.Println("Starting the server on:8080")
+		http.ListenAndServe(":8080", mapHandler)
 	}
+}
