@@ -70,8 +70,21 @@ func YAMLHandler(yamldata []byte, fallback http.Handler) (http.HandlerFunc, erro
 func BOLTHandler(db *bolt.DB, fallback http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := db.View(func(tx *bolt.Tx) error {
-			bucket:= tx.Bucket
-		})
+			bucket := tx.Bucket([]byte("pathsToURLs"))
+			if bucket != nil {
+				cursor := bucket.Cursor()
+				for path, url := cursor.First(); path != nil; url = cursor.Next() {
+					if string(path) == r.URL.Path {
+						http.Redirect(w, r, string(url), http.StatusFound)
+						return nil
+					}
+				}
+			}
+			return nil
+		}); err != nil {
+			panic(err)
+		}
+		fallback.ServeHTTP(w, r)
 	}
 }
 
@@ -125,7 +138,7 @@ func main() {
 		}
 		defer db.Close() //Close the database
 
-		//Build the BoltHandler using the mapHandler as the fallback 
+		//Build the BoltHandler using the mapHandler as the fallback
 		boltHandler := BOLTHandler(db, mapHandler)
 		fmt.Println("Starting the server on:8080")
 		http.ListenAndServe(":8080", boltHandler)
