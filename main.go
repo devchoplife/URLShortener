@@ -63,7 +63,7 @@ func YAMLHandler(yamldata []byte, fallback http.Handler) (http.HandlerFunc, erro
 				http.Redirect(w, r, urlPath.URL, http.StatusFound)
 			}
 		}
-		fall.ServeHTTP(w, r)
+		fallback.ServeHTTP(w, r)
 	}, nil
 }
 
