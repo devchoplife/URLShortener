@@ -11,16 +11,29 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+//http.ServeMux is an HTTP request multiplexer. It matches the URL of each incoming request
+//against a list of registered patterns and calls the handler for the pattern that most closely
+//matches the URL
 func defaultMux() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", hello)
+	//HandlerFunc registers the handler function for the given pattern in the defaultServeMux
+	mux.HandleFunc("/", hello) //arguments are pattern and handler
 	return mux
 }
 
+//http.ResponseWriter is used by an http handler to construct an http response while http.Request
+//is the request that is to be received by the server or to be sent by a client
 func hello(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello, World!")
+	fmt.Println(w, "Hello, World!")
 }
 
+//A handler responds to an http request
+//ServeHTTP should write reply headers and data to the ResponseWriter and then return.
+//Returning signals that the request is finished. It is not valid to use the ResponseWriter or read
+//from the Request.Body after or concurrently with the completion of the ServeHTTP call.
+
+//HandlerFunc type is an adapter to allow the use of ordinary functions such as HTTP handlers
+// If it is a function with the appropriate signature HandlerFunc(f) is a Handler that calls f
 func MapHandler(pathsToURLs map[string]string, fallback http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if path, ok := pathsToURLs[r.URL.Path]; ok {
